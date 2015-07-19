@@ -5,6 +5,16 @@ import org.apache.commons.io.FileUtils
 
 class TaskSpec extends FlatSpec with Matchers {
 
+  def withTasksDirectory(testCode: Path => Any) {
+    val tasksDirectory = Paths.get("temp_tasks_directory")
+    tasksDirectory.toFile.mkdir()
+    try {
+      testCode(tasksDirectory)
+    } finally {
+      FileUtils.deleteDirectory(tasksDirectory.toFile)
+    }
+  }
+
   "A TaskState" should "be able to be created" in {
     val ts1 = Task.TaskStates.NotStarted
     val ts2 = Task.TaskStates.withName("NOT_STARTED")
@@ -14,21 +24,14 @@ class TaskSpec extends FlatSpec with Matchers {
     }
   }
 
-  "A DummaryTasksCollection" should "be able to be created" in {
-    val tc = new Task.DummyTasksCollection
-  }
-
-  val tasksDirectory = Paths.get("temp_tasks_directory")
-  tasksDirectory.toFile().mkdir()
-
-  "A Task" should "be able to be created" in {
-    val tc = new Task.DummyTasksCollection
-    val t = Task.create(
+  "A Task" should "be able to be created" in withTasksDirectory {
+    tasksDirectory =>
+      val description = "Blah blah"
+      val t = Task.create(
       parentDirectory = tasksDirectory,
-      tasksCollection = tc,
-      description = "Testing task")
-  }
-  
-  FileUtils.deleteDirectory(tasksDirectory)
+      description = description)
+      assert(t.description == description)
+      assert(t.directory == tasksDirectory.resolve("task_0"))
+  }  
 
 }
