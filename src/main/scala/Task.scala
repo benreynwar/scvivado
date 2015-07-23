@@ -3,18 +3,50 @@ import java.io._
 import scala.io.Source
 import grizzled.slf4j.Logging
 
-/**    
-  *  An external process that we run.
-  * 
-  *  Each task has it's own directory created for it.
-  *  This directory contains the following files:
-  *   - state.txt - either NOT_STARTED, RUNNING, FINISHED_OK, FINISHED_ERROR.
-  */
+/**
+ *  A collection of tasks.
+ *
+ *  Corresponds to a directory.
+ *  Each task is in a subdirectory.
+ */
+object TaskCollection {
+  val lastIdFilename = "lastId.txt"
+}
+
+class TaskCollection(val directory: Path) {
+
+  def incrNextId(): Integer = {
+    val p = directory.resolve(TaskCollection.lastIdFilename)
+    val f = p.toFile
+    val nextId: Integer = if (Files.exists(p)) {
+      val lines = Source.fromFile(f).getLines()
+      lines.next().toInt + 1
+    } else {0}
+    val pw = new PrintWriter(f)
+    try pw.write(nextId.toString) finally pw.close()
+    nextId
+  }
+
+  def getTasks: Iterable[Task] = {
+    val subdirs: Iterable[File] = directory.toFile.listFiles().
+      filter(_.isDirectory).
+      filter(_.getName.startsWith("task_"))
+    val subdirpaths: Iterable[Path] = subdirs.map(x => Paths.get(x.getName))
+    subdirpaths.map(x => new Task(x))
+  }
+}
+
+/**
+ *  An external process that we run.
+ *
+ *  Each task has it's own directory created for it.
+ *  This directory contains the following files:
+ *   - state.txt - either NOT_STARTED, RUNNING, FINISHED_OK, FINISHED_ERROR.
+ */
 object Task {
 
   val stateFilename = "state.txt"
   val descriptionFilename = "description.txt"
-  val lastIdFilename = "lastId.txt"
 
   object TaskStates extends Enumeration {
     val NotStarted = Value("NOT_STARTED")
@@ -32,17 +64,6 @@ object Task {
     val pw = new PrintWriter(directory.resolve(descriptionFilename).toFile)
     try pw.write(description) finally pw.close()
   }
-  def getNextId(directory: Path) = {
-    val p = directory.resolve(lastIdFilename)
-    val f = p.toFile
-    val nextId = if (Files.exists(p)) {
-      val lines = Source.fromFile(f).getLines()
-      lines.next().toInt + 1
-    } else {0}
-    val pw = new PrintWriter(f)
-    try pw.write(nextId.toString) finally pw.close()
-    nextId
-  }
 
   
   /**
@@ -58,7 +79,7 @@ object Task {
     if (!Files.exists(parentDirectory)) {
       throw new Exception(s"Parent directory of task $parentDirectory does not exist")
     }
-    val id = getNextId(parentDirectory)
+    val id = new TaskCollection(parentDirectory).incrNextId()
     val dn = s"task_$id"
     val directory = parentDirectory.resolve(dn)
     directory.toFile.mkdir()
@@ -83,8 +104,8 @@ class Task(val directory: Path) {
   }
 
   def getState: Task.TaskState = {
-    val lines = Source.fromFile(statePath.toFile).getLines
-    Task.TaskStates.withName(lines.next)
+    val lines = Source.fromFile(statePath.toFile).getLines()
+    Task.TaskStates.withName(lines.next())
   }
 
   def setDescription(description: String) = {
@@ -92,11 +113,11 @@ class Task(val directory: Path) {
   }
 
   def getDescription: String = {
-    Source.fromFile(descriptionPath.toFile).getLines.mkString("\n")
+    Source.fromFile(descriptionPath.toFile).getLines().mkString("\n")
   }
 
   if (!Files.exists(directory)) {
-    throw new Exception("Task's directory does not exist: $directory")
+    throw new Exception(s"Task's directory does not exist: $directory")
   }
   val description = getDescription
 
@@ -109,12 +130,13 @@ class Task(val directory: Path) {
   def isFinished = {
     val state = getState
     Set(Task.TaskStates.FinishedOK,
-	Task.TaskStates.FinishedError).contains(state)
+      Task.TaskStates.FinishedError).contains(state)
   }
 
   def waitUntilFinished(pollInterval: Long = 1000) = {
     waitUntilTrue(pollInterval, () => isFinished)
   }
+
 }
 
 object TemplateHelper extends Logging{
@@ -123,14 +145,14 @@ object TemplateHelper extends Logging{
     var updated = text
     values.foreach {
       case (key, value) =>
-	updated = updated.replace(s"@${key}@", value)
+        updated = updated.replace(s"@$key@", value)
     }
-    return updated
+    updated
   }
   
   def formatTemplate(values: Map[String, String], templatePath: Path,
 		     outputPath: Path) = {
-    val template = Source.fromFile(templatePath.toFile).getLines.mkString("\n")
+    val template = Source.fromFile(templatePath.toFile).getLines().mkString("\n")
     val formatted = formatString(values, template)
     val pw = new PrintWriter(outputPath.toFile)
     try pw.write(formatted) finally pw.close()
@@ -142,7 +164,7 @@ object VivadoTask extends Logging {
 
   class MessageType(
     val name: String,
-    val logFunction: (=> Any, => Throwable) => Unit) {
+    val logFunction: (=> Any) => Unit) {
   }
 
   val debugMT = new MessageType("DEBUG", debug)
@@ -160,11 +182,10 @@ object VivadoTask extends Logging {
       val mt: Option[MessageType] = messageTypes.find(mt => line.startsWith(mt.name))
       mt match {
 	case None => None
-	case Some(messageType) => {
+	case Some(messageType) =>
 	  val startIndex = messageType.name.length+1
 	  val content = line.drop(startIndex)
 	  Some(new Message(content = content, messageType = messageType))
-	}
       }
     }
   }
@@ -183,8 +204,8 @@ object VivadoTask extends Logging {
     val templateArgs = Map(
       "command" -> commandText,
       "tclDirectory" -> tclDirectory)
-    debug("Creating a new VivadoTask in directory $directory")
-    debug("Command is $commandText")
+    debug(s"Creating a new VivadoTask in directory $directory")
+    debug(s"Command is $commandText")
     TemplateHelper.formatTemplate(
       values = templateArgs,
       templatePath = templatePath,
@@ -218,8 +239,8 @@ extends Task(directory = directory) {
     */
   def getMessages(ignoreStrings: Seq[String] = Config.defaultIgnoreStrings):
   Iterator[VivadoTask.Message] = {
-    val lines = Source.fromFile(directory.resolve("stdout.txt").toFile).getLines
-    val allMessages = (lines.map(VivadoTask.Message.fromLine)).flatten
+    val lines = Source.fromFile(directory.resolve("stdout.txt").toFile).getLines()
+    val allMessages = lines.map(VivadoTask.Message.fromLine).flatten
     allMessages.filter(m => !ignoreStrings.exists(m.content.contains(_)))
   }
 
@@ -227,4 +248,12 @@ extends Task(directory = directory) {
   Iterator[VivadoTask.Message] = {
     getMessages(ignoreStrings).filter(m => VivadoTask.errorMessageTypes.contains(m.messageType))
   }
+
+  def waitAndLog(pollInterval: Long = 1000) = {
+    waitUntilFinished(pollInterval)
+    getMessages().foreach(m =>
+      m.messageType.logFunction(m.content)
+    )
+  }
+
 }

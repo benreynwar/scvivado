@@ -1,5 +1,5 @@
 import org.scalatest._
-import java.nio.file.{Path, Paths, Files}
+import java.nio.file.{Path, Paths}
 import org.apache.commons.io.FileUtils
 
 class TaskSpec extends FlatSpec with Matchers {
@@ -52,7 +52,7 @@ class TaskSpec extends FlatSpec with Matchers {
       t.waitUntilFinished(1000)
       val msgs: List[VivadoTask.Message] = t.getErrorMessages().toList
       assert(msgs.length == 1)
-      assert(msgs(0).content.contains("do_this_super_thing"))
+      assert(msgs.head.content.contains("do_this_super_thing"))
     }
   }
 
