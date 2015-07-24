@@ -1,5 +1,4 @@
 import java.nio.file.{Path, Files}
-import java.io.File
 import grizzled.slf4j.Logging
 
 class Part {}
@@ -33,12 +32,11 @@ object Project extends Logging{
    * @param ips A list of the ip blocks with their names and parameters used.
    * @param topModuleName The name of the top level module.
    */
-  def setUp(directory: Path, designFiles: Set[File],
-            simulationFiles: Set[File], part: Option[Part] = None,
+  def setUp(directory: Path, designFiles: Set[Path],
+            simulationFiles: Set[Path], part: Option[Part] = None,
             board: Option[Board] = None, ips: Set[IP] = Set(),
             topModuleName: String = ""): VivadoTask = {
-    val absDirectory = directory.toAbsolutePath
-    if (Files.exists(absDirectory.resolve("TheProject.xpr"))) {
+    if (Files.exists(directory.resolve("TheProject.xpr"))) {
       throw AlreadyExistsException("Project already exists.")
     }
     val tclIPs = ips.map(_.getTCL).mkString(" ")
@@ -54,17 +52,17 @@ object Project extends Logging{
       case Some(b) => b.toString
       case None => ""
     }
-    val command = s"::pyvivado::create_vivado_project {$absDirectory} { $designFilesString } { $simulationFilesString } {$partString} {$boardString} {$tclIPs} {$topModuleName}"
+    val command = s"::pyvivado::create_vivado_project {${directory.toAbsolutePath}} { $designFilesString } { $simulationFilesString } {$partString} {$boardString} {$tclIPs} {$topModuleName}"
     debug(s"Command is $command")
     debug(s"Directory of new project is $directory")
-    val t = VivadoTask.create(parentDirectory = absDirectory, commandText = command,
+    val t = VivadoTask.create(parentDirectory = directory, commandText = command,
       description = "Creating a new Vivado project.")
     t.run()
     t
   }
 
-  def create(directory: Path, designFiles: Set[File],
-             simulationFiles: Set[File], part: Option[Part] = None,
+  def create(directory: Path, designFiles: Set[Path],
+             simulationFiles: Set[Path], part: Option[Part] = None,
              board: Option[Board] = None, ips: Set[IP] = Set(),
              topModuleName: String = ""): (Project, VivadoTask) = {
     val t: VivadoTask = setUp(
@@ -85,7 +83,7 @@ object Project extends Logging{
   *
   * @param directory Location of the vivado project.
   */
-class Project(val directory: Path) {
+class Project(directory: Path) {
   val filename = directory.resolve("TheProject.xpr")
 
   /**
@@ -102,11 +100,11 @@ class Project(val directory: Path) {
    * Spawn a Vivado process to synthesize the project.
    */
   def synthesize(keepHierarchy: Boolean = false): VivadoTask = {
-    val commandStart = s"::pyvivado::open_and_synthesize {$directory}"
+    val commandStart = s"::pyvivado::open_and_synthesize {${directory.toAbsolutePath}}"
     val commandText = if (keepHierarchy)
       s"$commandStart keep_hierarchy"
     else
-      commandStart
+      s"$commandStart {}"
     val t = VivadoTask.create(
       parentDirectory = directory,
       commandText = commandText,
@@ -120,7 +118,7 @@ class Project(val directory: Path) {
    * Spawn a Vivado process to implement the project.
    */
   def implement(): VivadoTask = {
-    val commandText = "::pyvivado::open_and_implement $directory"
+    val commandText = s"::pyvivado::open_and_implement ${directory.toAbsolutePath}"
     val t = VivadoTask.create(
       parentDirectory = directory,
       commandText = commandText,

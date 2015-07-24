@@ -1,5 +1,5 @@
 import java.nio.file.{Path, Paths, Files}
-import java.io._
+import java.io.{PrintWriter, File}
 import scala.io.Source
 import grizzled.slf4j.Logging
 
@@ -256,4 +256,9 @@ extends Task(directory = directory) {
     )
   }
 
+  def finishedWithNoErrors: Boolean = {
+    (getState == Task.TaskStates.FinishedOK) && getErrorMessages().isEmpty
+  }
 }
+
+

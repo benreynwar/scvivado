@@ -91,7 +91,7 @@ proc ::pyvivado::synthesize {keep_hierarchy} {
 proc ::pyvivado::implement {} {
     set implemented [::pyvivado::is_implemented]
     if {$implemented == 0} {
-        ::pyvivado::synthesize
+        ::pyvivado::synthesize {}
         launch_runs impl_1 -to_step write_bitstream
         wait_on_run impl_1
     }
@@ -101,7 +101,7 @@ proc ::pyvivado::implement {} {
 proc ::pyvivado::implement_without_bitstream {} {
     set implemented [::pyvivado::is_implemented]
     if {$implemented == 0} {
-        ::pyvivado::synthesize
+        ::pyvivado::synthesize {}
         launch_runs impl_1
         wait_on_run impl_1
     }
