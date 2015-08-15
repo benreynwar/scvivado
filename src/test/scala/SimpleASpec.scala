@@ -1,6 +1,25 @@
 import Chisel._
+import scala.util.Random
 import org.scalatest._
 import scala.math.pow
+import txt.testing
+
+class BlahTester(dut: SimpleA) {
+  val rnd = new Random()
+  val maxData = pow(2, dut.dataWidth).toInt
+  val maps: Vector[Map[String, Any]] = (0 to 16).map(i => {
+    Map[String, Any](
+      "i_valid" -> rnd.nextInt(2),
+      "i_data" -> rnd.nextInt(maxData),
+      "i_array" -> (0 to dut.arrayLength).map(i => {
+        rnd.nextInt(maxData)
+      })
+    )
+  }).to[Vector]
+  val booleans: Vector[Vector[Boolean]] = maps.map(m =>
+    Translator.toBooleans(dut.io, m))
+  val shard = "fish"
+}
 
 
 class SimpleATester(c: SimpleA) extends Tester(c) {
@@ -29,12 +48,20 @@ class SimpleASpec extends FlatSpec with Matchers {
   "SimpleA" should "compile" in {
     val testArgs = Array("--genHarness", "--compile", "--backend", "c")
     chiselMainTest(testArgs, () => Module(new SimpleA(dataWidth))
-  		 )(m => new Tester(m))
+    )(m => new Tester(m))
   }
   // "The output from SimpleA" should "be the same as it's input but delayed one clock cycle" in {
   //   val testArgs = Array("--test")
   //   chiselMainTest(testArgs, () => Module(new SimpleA(dataWidth))
   // 		 )(m => new SimpleATester(m))
   // }
+}
+
+
+class DohTester extends FlatSpec {
+  val rabbit: Map[String, String] = Map("fish" -> "shark", "monkey" -> "blue")
+  val bear = new SimpleA(3)
+  val rr = testing(bear.io)
+  println(rr)
 }
 

@@ -1,0 +1,6 @@
+@(rabbit: Chisel.Bundle)
+-- -*- vhdl -*- 
+
+@for((k, v) <- rabbit.flatten) {
+  @k blah blah @k
+}

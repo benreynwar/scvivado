@@ -1,20 +1,29 @@
 import Chisel._
-import math.pow
+import grizzled.slf4j.Logging
+
 
 class SimpleA(val dataWidth: Int) extends Module {
-  val dataType = Bits(INPUT, width = dataWidth)
+  def makeDataType(dir: IODirection): Bits = {
+    Bits(dir=dir, width=dataWidth)
+  }
   val arrayLength = 4
   val simpleB = Module(new SimpleB(dataWidth = dataWidth,
 				   arrayLength = arrayLength))
-  val arrayType = Vec(gen = dataType, n = arrayLength)
-  val io = new Bundle {
-    val i_valid = Bool(INPUT)
-    val i_data = dataType
-    val i_array = arrayType
-    val o_valid = Bool(OUTPUT)
-    val o_data = dataType.flip
-    val o_array = arrayType.flip
+  def makeArrayType(dir: IODirection): Vec[Bits] = {
+    Vec(gen=makeDataType(dir), n=arrayLength)
   }
+
+  class SimpleAIO extends Bundle {
+    val i_valid = Bool(INPUT)
+    val i_data = makeDataType(INPUT)
+    val i_array = makeArrayType(INPUT)
+    val o_valid = Bool(OUTPUT)
+    val o_data = makeDataType(OUTPUT)
+    val o_array = makeArrayType(OUTPUT)
+  }
+
+  val io = new SimpleAIO
+
   // val o_valid = RegNext(simpleB.io.o_valid)
   // val o_data = RegNext(simpleB.io.o_data)
   // val o_array = RegNext(simpleB.io.o_array)
